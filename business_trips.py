@@ -117,7 +117,17 @@ def compute_trips_possibilities(teacher, working_type):
 
 
 def delete_time_in_travel(time):
-    pass
+    for person in time:
+        count_in_row = 0
+        prev_day = -1
+        timeline = list(time[person])
+        for i, day in enumerate(timeline):
+            if day + 1 == prev_day:
+                count_in_row += 1
+            elif i != 0:
+                timeline[i - 1] = -1
+                timeline[i - count_in_row - 1] = -1
+        time[person] = {i for i in timeline if i > 0}
 
 
 def find_trips(priorities, frequency):
@@ -127,7 +137,6 @@ def find_trips(priorities, frequency):
     courses_teachers = get_courses_teachers(teachers_data)
     teachers_types = get_teachers_working_types(teachers_data)
 
-    teachers_free_days = dict()
     if path.isfile(path.join('input_data', 'trips_possibilities.csv')):
         data = pd.read_csv(path.join('input_data', 'trips_possibilities.csv'))
         keys = data['Преподаватель'].values.tolist()
@@ -145,7 +154,9 @@ def find_trips(priorities, frequency):
     for education_program in priorities:
         time_length = education_programs_data['Количество дней очно'][education_program]
         teachers = courses_teachers[education_program]
-        scan_line(trips_data, teachers, time_length, education_program)
+        timelines = {teacher: teachers_free_days[teacher] for teacher in teachers}
+        scan_line(trips_data, timelines, time_length, education_program)
+    trips_data.to_excel(path.join('output_data', 'trips.xlsx'), sheet_name='Командировки')
 
 
 def scan_line(trips_data, segments, length, education_program):
@@ -204,7 +215,7 @@ class History:
         self.clear()
 
     def save(self, df, education_program):
-        pass
+        df.loc[len(df)] = [education_program, ', '.join(self.lines), ', '.join(self.starts), ', '.join(self.ends)]
         self.clear()
 
     def clear(self):
