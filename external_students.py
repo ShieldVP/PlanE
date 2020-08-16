@@ -1,6 +1,6 @@
 import pandas as pd
-import mint as one
-import raspred as two
+import minimal_count_of_people_in_group as one
+import people_on_theme as two
 import os
 def how_much_man(list1):
     i=0
