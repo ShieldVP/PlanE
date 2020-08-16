@@ -29,7 +29,7 @@ def get_courses_teachers(teachers):
         for course in teachers_courses[teacher]:
             courses_teachers[course].add(teacher)
 
-    return courses_teachers
+    return keys, courses_teachers
 
 
 def is_working_day(line):
@@ -134,20 +134,23 @@ def find_trips(priorities, frequency):
     data_file = path.join('input_data', 'Приложение №2.xlsx')
     education_programs_data = pd.read_excel(data_file, sheet_name='параметры программ', index_col=0)
     teachers_data = pd.read_excel(data_file, sheet_name='параметры преподавателей')
-    courses_teachers = get_courses_teachers(teachers_data)
+    teachers_list, courses_teachers = get_courses_teachers(teachers_data)
     teachers_types = get_teachers_working_types(teachers_data)
 
-    if path.isfile(path.join('input_data', 'trips_possibilities.csv')):
-        data = pd.read_csv(path.join('input_data', 'trips_possibilities.csv'))
+    if path.isfile(path.join('output_data', 'trips_possibilities.csv')):
+        data = pd.read_csv(path.join('output_data', 'trips_possibilities.csv'))
         keys = data['Преподаватель'].values.tolist()
-        vals = list(map(extract_courses, data['Дни'].values.tolist()))
+        vals = list(map(eval, data['Дни'].values.tolist()))
         teachers_free_days = dict(zip(keys, vals))
     else:
         teachers_free_days = {
-            teacher: compute_trips_possibilities(teacher, teachers_types[teacher]) for teacher in courses_teachers
+            teacher: compute_trips_possibilities(teacher, teachers_types[teacher]) for teacher in teachers_list
         }
-        data = pd.DataFrame({'Преподаватель': teachers_free_days.keys(), 'Дни': teachers_free_days.values()})
-        data.to_csv(path.join('input_data', 'trips_possibilities.csv'))
+        data = pd.DataFrame({
+            'Преподаватель': list(teachers_free_days.keys()),
+            'Дни': list(teachers_free_days.values())
+        })
+        data.to_csv(path.join('output_data', 'trips_possibilities.csv'))
     delete_time_in_travel(teachers_free_days)
 
     trips_data = pd.DataFrame(columns=['Учебная программа', 'Преподаватели', 'Начало поездки', 'Конец поездки'])
@@ -215,7 +218,12 @@ class History:
         self.clear()
 
     def save(self, df, education_program):
-        df.loc[len(df)] = [education_program, ', '.join(self.lines), ', '.join(self.starts), ', '.join(self.ends)]
+        df.loc[len(df)] = [
+            education_program,
+            ', '.join(str(i) for i in self.lines),
+            ', '.join(str(i) for i in self.starts),
+            ', '.join(str(i) for i in self.ends)
+        ]
         self.clear()
 
     def clear(self):
@@ -223,3 +231,6 @@ class History:
         self.lines = []
         self.starts = []
         self.ends = []
+
+
+find_trips([i for i in range(1, 41)], 'High')
