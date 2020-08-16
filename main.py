@@ -1,6 +1,8 @@
 from business_trips import find_trips
 from external_students import how_much_man
 from random2 import randint
+from os import path
+import pandas as pd
 
 
 def main():
@@ -22,7 +24,11 @@ def main():
         least[i], least[index] = least[index], least[i]
     priorities += least
     find_trips(priorities, 'High')
-    print(how_much_man(priorities))
+
+    data_file = path.join('input_data', 'amount_of_days.xlsx')
+    education_programs_data = pd.read_excel(data_file, sheet_name='Лист1', index_col=0)
+    lst = list(education_programs_data.columns.values)[:19]
+    print(how_much_man(lst))
 
 
 if __name__ == "__main__":
