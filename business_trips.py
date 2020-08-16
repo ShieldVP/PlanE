@@ -231,6 +231,3 @@ class History:
         self.lines = []
         self.starts = []
         self.ends = []
-
-
-find_trips([i for i in range(1, 41)], 'High')
