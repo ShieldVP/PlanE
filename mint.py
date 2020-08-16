@@ -4,15 +4,14 @@ def min_band(name):
     p1 = pd.read_excel(os.path.join(r'input_data', 'min_group.xlsx'))  
     p2 = pd.read_excel(os.path.join(r'input_data', 'predmetes.xlsx'), sheet_name='параметры аудиторий')
     i=0
-    min=10000
-    a=1
-    a=p1[name].shape[0]
-    for i in range(a):
+    min=1000
+    b=1
+    b=p1.shape[0]
+    name=str(name)
+    for i in range(b):
         s1=p1[name][i]
-        print(p1['Аудитрия'][0])
         if s1==p2['Аудитрия'][0]:
             if p2['Количество мест'][0]<min:
-                print(p2['Количество мест'][0])
                 min=p2['Количество мест'][0]
         if s1==p2['Аудитрия'][1]:
             if p2['Количество мест'][1]<min:
