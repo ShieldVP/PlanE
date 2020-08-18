@@ -3,6 +3,9 @@ from os import path
 from datetime import datetime as dt
 
 
+# Getting teachers' free days
+
+
 def get_teachers_working_types(teachers):
     keys = teachers['Преподаватель'].values.tolist()
     keys = list(map(lambda lst: lst.split()[0], keys))
@@ -44,33 +47,6 @@ def is_teacher_work(line, teacher):
         if isinstance(line[column], str) and line[column].startswith(teacher):
             return True
     return False
-
-
-def normalize_date_from_schedule(date):
-    months = {
-        'января': '01',
-        'февраля': '02',
-        'марта': '03',
-        'апреля': '04',
-        'мая': '05',
-        'июня': '06',
-        'июля': '07',
-        'августа': '08',
-        'сентября': '09',
-        'октября': '10',
-        'ноября': '11',
-        'декабря': '12',
-    }
-
-    date = date.split('\n')[0]
-    old_format_month = date.split()[1]
-    date = date.replace(old_format_month, months[old_format_month])
-
-    return int(dt.strptime(date, '%d %m').strftime('%j'))
-
-
-def normalize_date(day, month):
-    return int(dt.strptime(f'{day} {month}', '%d %m').strftime('%j'))
 
 
 def compute_trips_possibilities(teacher, working_type):
@@ -122,44 +98,51 @@ def delete_time_in_travel(time):
         prev_day = -1
         timeline = list(time[person])
         for i, day in enumerate(timeline):
-            if day + 1 == prev_day:
+            if day == prev_day + 1:
                 count_in_row += 1
             elif i != 0:
                 timeline[i - 1] = -1
                 timeline[i - count_in_row - 1] = -1
+                count_in_row = 0
+            prev_day = day
         time[person] = {i for i in timeline if i > 0}
 
 
-def find_trips(priorities, frequency):
-    data_file = path.join('input_data', 'Приложение №2.xlsx')
-    education_programs_data = pd.read_excel(data_file, sheet_name='параметры программ', index_col=0)
-    teachers_data = pd.read_excel(data_file, sheet_name='параметры преподавателей')
-    teachers_list, courses_teachers = get_courses_teachers(teachers_data)
-    teachers_types = get_teachers_working_types(teachers_data)
+# Dates conversations
 
-    if path.isfile(path.join('output_data', 'trips_possibilities.csv')):
-        data = pd.read_csv(path.join('output_data', 'trips_possibilities.csv'))
-        keys = data['Преподаватель'].values.tolist()
-        vals = list(map(eval, data['Дни'].values.tolist()))
-        teachers_free_days = dict(zip(keys, vals))
-    else:
-        teachers_free_days = {
-            teacher: compute_trips_possibilities(teacher, teachers_types[teacher]) for teacher in teachers_list
-        }
-        data = pd.DataFrame({
-            'Преподаватель': list(teachers_free_days.keys()),
-            'Дни': list(teachers_free_days.values())
-        })
-        data.to_csv(path.join('output_data', 'trips_possibilities.csv'))
-    delete_time_in_travel(teachers_free_days)
 
-    trips_data = pd.DataFrame(columns=['Учебная программа', 'Преподаватели', 'Начало поездки', 'Конец поездки'])
-    for education_program in priorities:
-        time_length = education_programs_data['Количество дней очно'][education_program]
-        teachers = courses_teachers[education_program]
-        timelines = {teacher: teachers_free_days[teacher] for teacher in teachers}
-        scan_line(trips_data, timelines, time_length, education_program)
-    trips_data.to_excel(path.join('output_data', 'trips.xlsx'), sheet_name='Командировки')
+def normalize_date_from_schedule(date):
+    months = {
+        'января': '01',
+        'февраля': '02',
+        'марта': '03',
+        'апреля': '04',
+        'мая': '05',
+        'июня': '06',
+        'июля': '07',
+        'августа': '08',
+        'сентября': '09',
+        'октября': '10',
+        'ноября': '11',
+        'декабря': '12',
+    }
+
+    date = date.split('\n')[0]
+    old_format_month = date.split()[1]
+    date = date.replace(old_format_month, months[old_format_month])
+
+    return int(dt.strptime(date, '%d %m').strftime('%j'))
+
+
+def normalize_date(day, month):
+    return int(dt.strptime(f'{day} {month}', '%d %m').strftime('%j'))
+
+
+def make_date_readable(date):
+    return dt.strptime(str(date), '%j').strftime('%d.%m')
+
+
+# Scanning line algorithm
 
 
 def scan_line(trips_data, segments, length, education_program):
@@ -173,7 +156,7 @@ def scan_line(trips_data, segments, length, education_program):
                     history[line].starts.append(pointer)
                 if history[line].days >= length:
                     history[line].ends.append(pointer)
-                    history[line].save(trips_data, education_program)
+                    history[line].save(trips_data, education_program, segments)
             else:
                 history[line].ends.append(pointer - 1)
         for line in segments:
@@ -184,7 +167,8 @@ def scan_line(trips_data, segments, length, education_program):
                         if history[son_line].days < history[line].days + 1:
                             history[line].move(history[son_line])
                             if history[son_line].days >= length:
-                                history[son_line].save(trips_data, education_program)
+                                history[son_line].ends.append(history[son_line].starts[-1] + 1)
+                                history[son_line].save(trips_data, education_program, segments)
                             continued = True
                             break
                 if not continued:
@@ -217,13 +201,24 @@ class History:
 
         self.clear()
 
-    def save(self, df, education_program):
-        df.loc[len(df)] = [
-            education_program,
-            ', '.join(str(i) for i in self.lines),
-            ', '.join(str(i) for i in self.starts),
-            ', '.join(str(i) for i in self.ends)
-        ]
+    def save(self, df, education_program, segments):
+        try:
+            for step_num in range(len(self.lines)):
+                line = self.lines[step_num]
+                start = self.starts[step_num]
+                end = self.ends[step_num]
+                for day in range(start, end + 1):
+                    segments[line].remove(day)
+
+            df.loc[len(df)] = [
+                education_program,
+                ', '.join(str(i) for i in self.lines),
+                ', '.join(make_date_readable(i) for i in self.starts),
+                ', '.join(make_date_readable(i) for i in self.ends)
+            ]
+        except:
+            pass
+
         self.clear()
 
     def clear(self):
@@ -231,3 +226,38 @@ class History:
         self.lines = []
         self.starts = []
         self.ends = []
+
+
+# Main algorithm
+
+
+def find_trips(priorities, frequency):
+    data_file = path.join('input_data', 'Приложение №2.xlsx')
+    education_programs_data = pd.read_excel(data_file, sheet_name='параметры программ', index_col=0)
+    teachers_data = pd.read_excel(data_file, sheet_name='параметры преподавателей')
+    teachers_list, courses_teachers = get_courses_teachers(teachers_data)
+    teachers_types = get_teachers_working_types(teachers_data)
+
+    if path.isfile(path.join('output_data', 'trips_possibilities.csv')):
+        data = pd.read_csv(path.join('output_data', 'trips_possibilities.csv'))
+        keys = data['Преподаватель'].values.tolist()
+        vals = list(map(eval, data['Дни'].values.tolist()))
+        teachers_free_days = dict(zip(keys, vals))
+    else:
+        teachers_free_days = {
+            teacher: compute_trips_possibilities(teacher, teachers_types[teacher]) for teacher in teachers_list
+        }
+        data = pd.DataFrame({
+            'Преподаватель': list(teachers_free_days.keys()),
+            'Дни': list(teachers_free_days.values())
+        })
+        data.to_csv(path.join('output_data', 'trips_possibilities.csv'))
+    delete_time_in_travel(teachers_free_days)
+
+    trips_data = pd.DataFrame(columns=['Учебная программа', 'Преподаватели', 'Начало поездки', 'Конец поездки'])
+    for education_program in priorities:
+        time_length = education_programs_data['Количество дней очно'][education_program]
+        teachers = courses_teachers[education_program]
+        timelines = {teacher: teachers_free_days[teacher] for teacher in teachers}
+        scan_line(trips_data, timelines, time_length, education_program)
+    trips_data.to_excel(path.join('output_data', 'trips.xlsx'), sheet_name='Командировки')
